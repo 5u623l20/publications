@@ -1,0 +1,250 @@
+#+TITLE:  Anatomy of a simple mail system with FreeBSD #+AUTHOR: Moin Rahman
+#+EMAIL: moin at bofh dot im
+#+DATE: <2022-06-20 Mon> 
+#+LANGUAGE: en
+#+STARTUP: indent showeverything logdrawer
+#+OPTIONS: toc:nil num:nil
+#+TAGS: sample draft
+#+TODO: TODO(t) DRAFT(f@/!) IN-THE-BOOK(i!) | DONE(d!) CANCELED(c)
+
+* DRAFT Introduction
+:LOGBOOK:
+- State "DRAFT"      from "TODO"       [2022-06-28 Tue 11:08] \\
+  Initial DRAFT
+:END:
+Mail systems are often feared by many sysadmins; unfortunately that is
+not their fault. The RFCs of the mail systems were not done in a
+collaborative way and often has been the cause of many confusion. One
+such example is in the earlier RFCs it was mainly mentioned as messages
+while the later ones mentioned about mails; and both the words were used
+interchangeably. On top of that there is no one single open source
+system that comprises the entire Email ecosystem except [[https://www.courier-mta.org/][Courier Mail
+Server]]. And which is not so famous due to some reasons. Hence to have a
+fully working mail system sysadmins has to go through the integration of
+couple of softwares to run an effective email system. In this document
+we will try to explain some of the basics of the mail system and how to
+configure a working system using different components.
+* DRAFT Preamble
+:LOGBOOK:
+- State "DRAFT"      from "TODO"       [2022-06-28 Tue 11:58] \\
+  Initial DRAFT
+:END:
+For the sake of this document we will consider that we have a tiny VPS
+with some provider or we are running a [[https://docs.freebsd.org/doc/13.0-RELEASE/usr/local/share/doc/freebsd/handbook/virtualization-host-bhyve.html][bhyve]] vm or a [[https://docs.freebsd.org/en/books/handbook/jails/][FreeBSD jail]]
+somewhere. The host/vm/jail has an interface =vtnet0= which is configured
+with an IPv4 address of =192.0.2.100= and an IPv6 address of
+=2001:db8:f433:b5d:192:0:2:100=. This host will be used to serve all sort
+of mail communication for a domain called =example.org=. And there is only
+one real user =ariel@example.org= who will have access to the mail
+system. Email systems can be configured against sql databases, LDAP
+Directory, plain files and so many ways but for the sake of simplicity
+we will consider that mail users will be served from System =passwd= file
+that is any users who has access to the system can have access to
+emails. Additionally we will not show POP(Post Office Protocol). As
+nowadays everyone uses multiple devices POP doesn’t make too much
+sense. As the name goes POP works as simple as a Post Office. Once a
+post office delivers the mail to a recipient it’s function is over; if
+someone wants to get the same mail Post Office cannot provide it
+anymore. Although there have been implementation of POP where emails can
+be stored on the server and downloaded in another mail client. But that
+doesn’t handle sync well. We will start pointing some DNS entry for the
+proper function:
+
+| Hostname         | Record Type | Resource Record(RR)           |
+|------------------+-------------+-------------------------------|
+| =mx.example.org=   | =A=           | =192.0.2.100=                   |
+| =mx.example.org=   | =AAAA=        | =2001:db8:f433:b5d:192:0:2:100= |
+| =smtp.example.org= | =CNAME=       | =mx.example.org.=               |
+| =imap.example.org= | =CNAME=       | =mx.example.org.=               |
+
+We also need to configure reverse dns entry for our IPv4 and IPV6 addresses as following:
+| FQDN                                                                     | Record Type | Resource Record(RR) |
+|--------------------------------------------------------------------------+-------------+---------------------|
+| =100.2.0.192.in-addr.arpa=                                                 | =PTR=         | =mx.example.org.=     |
+| =0.0.1.0.2.0.0.0.0.0.0.0.2.9.1.0.d.5.b.0.3.3.4.f.8.b.d.0.1.0.0.2.ip6.arpa= | =PTR=         | =mx.example.org.=     |
+
+* TODO Setup Process
+** DRAFT Certificates
+:LOGBOOK:
+- State "DRAFT"      from "TODO"       [2022-07-02 Sat 01:13] \\
+  Add first DRAFT
+:END:
+We will start with creating [[https://letsencrypt.org/][Let's Encrypt]] certificate for the subdomains
+we have mentioned above. For simplicity we will use [[https://certbot.eff.org/][certbot]]. We will
+need a certificate for all the subdomains because we want to try to
+encrypt our connections as much as possible.
+*** TODO Install packages
+*** TODO Create certificates
+** TODO Add System User
+** DRAFT Mail/Message Transfer Agent
+:LOGBOOK:
+- State "DRAFT"      from "TODO"       [2022-07-02 Sat 01:28] \\
+  Add first DRAFT
+:END:
+There are lots of Message/Mail Transfer Agent which focuses mainly on
+carrying our mails across different domains or same domain. When we are
+sending a mail to someone outside of =@example.org= there must be a
+uniform protocol and mechanism to carry out message to a different
+server or same server. This is the [[https://en.wikipedia.org/wiki/Simple_Mail_Transfer_Protocol][Simple Mail Transfer
+Protocol(SMTP)]]. By default SMTP runs on port 25. There are lots of Open
+Source implementations of SMTP protocol or server; [[https://www.proofpoint.com/us/products/email-protection/open-source-email-solution][Sendmail]], [[https://cr.yp.to/qmail.html][qmail]],
+[[https://www.postfix.org/][Postfix]], [[https://www.exim.org/][exim]], [[https://www.courier-mta.org/][Courier Mail Server]] are a few important to name. But most
+of them are some behemoths in their functionalities which requires a lot
+of in depth understanding of the mail ecosystem and the configuration
+are also difficult to understand and make meanings out of it. So today
+we will skip the traditional path of those ones and try to implement an
+SMTP server using [[https://www.opensmtpd.org/][OpenSMTPD]] from the working Groups of another BSD
+system; [[https://www.openbsd.org/][OpenBSD]]. [[https://www.opensmtpd.org/][OpenSMTPD]] is a very lightweight and small SMTP
+implementation with the basics which is fully RFC compliant.
+*** TODO Install packages
+*** TODO Configure OpenSMTPD
+** DRAFT Mail/Message Delivery Agent
+:LOGBOOK:
+- State "DRAFT"      from "TODO"       [2022-07-02 Sat 02:08] \\
+  Add first DRAFT
+:END:
+Now we have a system that can receive a mail from an end user to be
+sent, or receive a mail from another server that has a destination to
+this server. Normally when we have configured the MX entry of
+=example.org= in the above mentioned DNS entries we have actually let the
+entire world know that if you want to send a mail to any users of
+=example.org= you should send it to the host =mx.example.org=. But when the
+mail arrives for a user the SMTP system needs to know how to process the
+mail. Like where to find the user and where to write the mail for the
+user so that the user can connect to this server and read the mail. Here
+comes the function of an Message/Mail Delivery Agent. It’s the function
+of an MDA to take the mail from MTA and write it to the file/directory
+of the user. So let’s configure an MDA server. In addition to the above
+mentioned MTA [[https://www.dovecot.org/][Dovecot]] can be used as an MDA but as mentioned at the
+beginning we will use [[https://www.opensmtpd.org/][OpenSMTPD]] for the sake of simplicity.
+
+*** TODO Configure OpenSMTPD
+** DRAFT Mail/Message Retrieval Agent
+:LOGBOOK:
+- State "DRAFT"      from "DRAFT"      [2022-07-02 Sat 02:40] \\
+  Add first DRAFT
+- State "DRAFT"      from "TODO"       [2022-07-02 Sat 02:22] \\
+  Add first DRAFT
+:END:
+There is no formal definition of MRA or Mail/Message Retrieval Agent in
+any RFC but we will need a mechanism where the user can connect to the
+server and also retrieve the mails. As mentioned earlier there are
+mainly two methods for message retrieval [[https://en.wikipedia.org/wiki/Post_Office_Protocol][Post Office Protocol version
+3(POP3)]] and [[https://en.wikipedia.org/wiki/Internet_Message_Access_Protocol][Internet Message Access Protocol(IMAP)]]. Mails can also be
+retrieved from files/directories when you have a terminal access to the
+server which is holding the mails in this case the server itself.
+As like as MTA there are lots of open source implementation of MRA. But
+we will concentrate on [[https://www.dovecot.org/][Dovecot]]. Other MRA like [[https://www.courier-mta.org/imap/][Courier IMAP]] and [[https://www.cyrusimap.org/][Cyrus
+IMAP]] had the reputation of corrupting users emails; specially [[https://www.courier-mta.org/imap/][Courier
+IMAP]]. There are mainly two ways mails can be stored for users in the
+server: the old traditional [[https://en.wikipedia.org/wiki/Mbox][mbox]] format which is is like a single file
+for a single folder of mails with an additional index file. And [[https://en.wikipedia.org/wiki/Maildir][Maildir]] 
+which keeps all the mails in individual files even with if they belong
+to same folder. But in case of mbox if the file of a folder is corrupted
+we lose all the mails of that folder whereas for maildir if a single
+file gets corrupted only that mail is destroyed. Due to this reason
+[[https://www.dovecot.org/][Dovecot]] got its fame overnight and still considered as the most reliable
+POP or IMAP implementation. For the sake of simplicity mentioned earlier
+we will stick with IMAP only and use maildir format.
+
+*** TODO Install packages
+*** TODO Configure Dovecot
+** DRAFT Mail/Message User Agent
+:LOGBOOK:
+- State "DRAFT"      from "TODO"       [2022-07-02 Sat 03:18] \\
+  Add first DRAFT
+:END:
+Now we can both send and receive a mail. We just need an application
+that an end user can use to send mail through our server and receive
+mails from the server to read. This is defined as [[https://en.wikipedia.org/wiki/Email_client][Mail/Message User
+Agent]]. There are hundreds of mail clients in different platform but
+[[https://www.thunderbird.net/][Thunderbird]] seems to be the winner. If you are a terminal junkie [[http://www.mutt.org/][mutt]],
+[[https://neomutt.org/][NeoMutt]], [[https://www.gnus.org/][GNUS]] are the mostly used ones. Just point your configuration to
+the following:
+
+| Field       | Value                           |
+|-------------+---------------------------------|
+| =Username=    | ariel                           |
+| =Password=    | As set in step [[*Add System User]] |
+| =IMAP server= | imap.example.org                |
+| =IMAP port=   | 993                             |
+| =SMTP Server= | smtp.example.org                |
+| =SMTP Port=   | 587                             |
+
+And we are done. We have a fully functioning mail system.
+** TODO Securing mail system
+But this is not enough. Due to it’s nature as a plain text protocol in
+the earlier days mail system has been the victim of prying eyes for mail
+spamming or mail spoofing. So we need to take some security
+measurements.
+*** DRAFT Sender Policy Framework (SPF)
+:LOGBOOK:
+- State "DRAFT"      from "TODO"       [2022-07-02 Sat 04:28] \\
+  Add first DRAFT
+:END:
+Not to be confused with Shortest Path First. [[https://en.wikipedia.org/wiki/Sender_Policy_Framework][Sender Policy
+Framework(SPF)]] is more like a list of IP addresses or hostname which
+mentions the list of hosts that are allowed to send mails on behalf of
+a domain or sub domain. But be aware that if the receiving side is not
+doing SPF check then there is no implecation of using this
+service. Although nowadays most of the mail system has some sort of
+SPF check. SPF is configured through a dns TXT records where we
+mention which hosts are allowed to send mails on behalf of our domain
+=example.org=.
+If we don’t mention this that means anyone can spoof a mail
+originating from =example.org= and all other servers will accept the
+email. Once after more dissection they find that the mail is a spoofed
+email we will lose reputation of the domain =example.org= .
+
+| FQDN             | Record Type | Resource Record(RR)           |
+|------------------+-------------+-------------------------------|
+| =example.org=      | =TXT=         | =v=spf1 mx -all=                |
+
+The problem is this line just confirms that mails from =example.org= may
+originate from the =MX= record of the domain only. But what everyone
+fails to understand is we have other subdomains like =imap.example.org=,
+=smtp.example.org= which we have configured and if someone sends a mail
+with from =ariel@imap.example.org= it will pass this security. So
+whenever we are creating a subdomain we should make sure whether if
+that subdomain is allowed to send mail or not. In the following table
+we will try to add some more records based on the sub domain we have
+created in the [[*Preamble]] section and will try share some reasons why
+we should create those:
+
+| Hostname         | Record Type | Resource Record(RR) | Reason                                                                                                                                                                                                       |
+|------------------+-------------+---------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| =mx.example.org=   | =TXT=         | =v=spf1 a -all=       | This is a real host as we have named our hostname =mx.example.org= and this host can send system mails; so if the hostname has an A or AAAA record the mails from those IP addresses are allowed to send mails |
+| =smtp.example.org= | =TXT=         | =v=spf1 -all=         | This is a =CNAME= to =mx.example.org= and by no way someone is supposed to send mail as =someone@smtp.example.org=; so no hosts are allowed to send mails                                                          |
+| =imap.example.org= | =TXT=         | =v=spf1 -all=         | This is a =CNAME= to =mx.example.org= and by no way someone is supposed to send mail as =someone@imap.example.org=; so no hosts are allowed to send mails                                                          |
+
+SPF is mostly used along with [[*DKIM Signing]] and [[*DMARC Policy]] which we
+will discuss in the following section. Often other receiving system
+just checks the presence of SPF record but the proper way to handle
+this is taking action based on [[https://en.wikipedia.org/wiki/DMARC#Step_by_step_adoption][DMARC (Domain-based Message
+Authentication, Reporting and Conformance)]] policy.
+
+*** TODO DKIM Signing
+**** TODO Create signing keys
+**** TODO Configure OpenSMTPD to use signing keys
+**** TODO Revisit DNS Entry
+*** TODO DMARC Policy
+**** TODO Create signing keys
+**** TODO Configure OpenSMTPD to use signing keys
+**** TODO Revisit DNS Entry
+*** DRAFT AntiSpam
+:LOGBOOK:
+- State "DRAFT"      from "TODO"       [2022-07-02 Sat 03:43] \\
+  Add first DRAFT
+:END:
+We have covered some basic antispam mechanism in the [[*Configure
+OpenSMTPD]] section. But there are lots of other things that can be done
+with applications like [[https://rspamd.com/][Rspamd]] but for the sake of simplicity we will not
+get into there today and we will try to cover up an entire new article on
+[[https://rspamd.com/][Rspamd]] sometimes in the future.
+*** TODO Signing mails with gpg
+**** TODO Install packages
+**** TODO Create initial keys
+**** TODO Create sub-keys
+**** TODO Store Master keys
+**** TODO Remove Master keys from portable devices
+* TODO Conclusion
