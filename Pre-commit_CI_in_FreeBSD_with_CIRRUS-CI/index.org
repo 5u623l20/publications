@@ -1,0 +1,118 @@
+#+TITLE: Pre-commit CI in FreeBSD with CIRRUS-CI
+#+AUTHOR: Moin Rahman
+#+EMAIL: bofh@FreBSD.org
+
+#+REVEAL_INIT_OPTIONS: width:1200, height:800, margin: 0.1, minScale:0.2, maxScale:2.5, transition:'cube'
+#+OPTIONS: date:nil toc:nil num:nil timestamp:nil
+#+REVEAL_HLEVEL: 1
+#+REVEAL_THEME: simple
+#+REVEAL_HEAD_PREAMBLE: <meta name="description" content="BOFH">
+#+REVEAL_POSTAMBLE: <p> Created by bofh. </p>
+#+REVEAL_PLUGINS: (markdown notes highlight)
+#+REVEAL_HIGHLIGHT_CSS: https://cdn.jsdelivr.net/npm/reveal.js@4/plugin/highlight/monokai.min.css
+
+* $ whoami
+- bofh (The B******/Moin)
+- FreeBSD
+  - ports committer
+  - Avid docs/src contributor
+- Professional paranoid
+- Conference hopper and repeat offender
+- Lifelong student/Avid technical trainer
+
+* Background
+** What everyone thinks about us
+[[./img/commit_log.png]]
+** What we actually do
+[[./img/ci.png]]
+
+* Current Status
+- No pre-commit testing facility
+- Developers just do basic functionality testing
+- Jenkins cluster tests the builds on various archs after the commit
+- Difficult to point committer on the hook
+- Low interest from developers on deploying their own jenkins cluster
+- Lots of test failures
+
+* Requirements
+- An uniform set of scripts
+- Compatible with testing from
+  - command line (what do you think of make ci?)
+  - Jenkins
+  - ^(?:Hosted )?Gitlab !!
+  - Github Actions!!
+  - Github + Cirrus-CI !!
+- Low resource hungry
+- Accessbile to most developers
+    
+* Possible solution analysis
+** command line
+- Pros
+  - Developer can use own hardware
+- Cons
+  - Requires huge time for non-x86 on qemu
+  - Requires huge fire power
+  - Based on current electricity cost may not be a viable solution
+** Jenkins
+Mostly like command line; but
+- Pros
+  - Possibility of using other cloud services like GCP/AWS
+  - Have to find a viable way of sharing resources as we do get AWS credits
+  - Due to the integration of third party plugins can be used as our post-commit CI/CD system
+  - Archives of logs and history
+- Cons
+  - Simulating an artifact server is difficult locally
+  - Need to figure out an easy way of deployment for developers
+    
+** ^(?:Hosted )?Gitlab
+Gitlab's new policy for open source projects is difficult to attain. Hosted
+Gitlab can be considered.
+- Pros
+  - Gitlab runner runs on FreeBSD
+  - Can be integrated with other Cloud providers like with Jenkins
+- Cons
+  - Gitlab ecosystem is difficult to maintain
+  - Upgrade procedure is also a bit cumbersome and requires investment of time
+  - Security concern
+** Github Actions
+- Pros
+  - Some minor smoke tests can be performed
+- Cons
+  - Resources for free accounts are too low to complete full build and test within the 6 hour time limits
+  - Github runners are not compatible with FreeBSD host
+** Github + Cirrus-CI
+- Pros
+  - Free resources are adequate enough to complete x86 based builds and tests
+  - cirrus-cli(runner) supports FreeBSD and already on the tree
+  - Can be integrated with other Cloud Providers like AWS/GCP/Azure
+  - GCP and ARM is still in beta and once released Cirrus wil bring support for ARM
+- Cons
+  - Only supports Github and Gitlab with hacks
+  
+* Current Progress
+- CIRRUS-CI with some limitations
+- Current test cases are for i386/amd64
+- No support for non-x86 tests due to time limit
+- Possible of integration in case running on cloud
+- JUnit support is pending
+- No pull request build support yet
+- Uses the modified scripts of our Jenkins scripts
+
+* Testing procedure
+- Create a fork from https://github.com/freebsd/freebsd-src
+- Enable Cirrus-CI for the project
+- Get the patch from https://reviews.freebsd.org/D36257
+- Apply the patch on a new branch named *jarvis(IMPORTANT)*
+
+* CI Results
+[[./img/ci-results.png]]
+* Questions
+
+  Courtesy to:
+
+#+ATTR_REVEAL: :frag roll-in
+  The FreeBSD Foundation
+#+ATTR_REVEAL: :frag roll-in
+  lwhsu
+#+ATTR_REVEAL: :frag roll-in
+  imp
